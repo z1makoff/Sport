@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Sport</string>
+    <string name="channel_timer">Таймер тренировки</string>
+    <string name="notif_running">Тренировка идёт</string>
+    <string name="notif_paused">Пауза · %1$s</string>
+</resources>
