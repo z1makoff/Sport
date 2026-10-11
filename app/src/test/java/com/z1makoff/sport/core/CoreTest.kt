@@ -57,6 +57,24 @@ class CoreTest {
         assertNull(ghostDeltaMs(10_000, emptyList(), listOf(1L), 3))
     }
 
+    @Test fun ghostStatusBand() {
+        assertEquals(GhostStatus.Even, ghostStatus(0))
+        assertEquals(GhostStatus.Even, ghostStatus(499))
+        assertEquals(GhostStatus.Even, ghostStatus(-499))
+        assertEquals(GhostStatus.Behind, ghostStatus(500))
+        assertEquals(GhostStatus.Ahead, ghostStatus(-500))
+    }
+
+    @Test fun restWords() {
+        assertEquals("меньше секунды", spokenDuration(400))
+        assertEquals("5 сек", spokenDuration(5_900))
+        assertEquals("2 мин", spokenDuration(120_000))
+        assertEquals("1 мин 5 сек", spokenDuration(65_000))
+        assertEquals("Впереди рекорда на 5 сек. Ты впереди рекорда, не сбавляй!", restAnnouncement(-5_200))
+        assertEquals("Позади рекорда на 3 сек. Выложись до самого конца!", restAnnouncement(3_000))
+        assertEquals("Идёшь вровень с рекордом, поднажми!", restAnnouncement(200))
+    }
+
     @Test fun splitsRoundTrip() {
         assertEquals(listOf(1L, 22L, 333L), decodeSplits(encodeSplits(listOf(1, 22, 333))))
         assertEquals(emptyList<Long>(), decodeSplits(""))

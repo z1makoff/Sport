@@ -44,3 +44,44 @@ fun encodeSplits(splits: List<Long>): String = splits.joinToString(",")
 
 fun decodeSplits(text: String): List<Long> =
     if (text.isBlank()) emptyList() else text.split(',').mapNotNull { it.trim().toLongOrNull() }
+
+enum class GhostStatus { Ahead, Even, Behind }
+
+/**
+ * Within half a second either way counts as even with the record, so the line does not
+ * flicker between "ahead" and "behind" on tenths. Same band as rounding the gap to whole seconds.
+ */
+fun ghostStatus(deltaMs: Long): GhostStatus = when {
+    deltaMs <= -500 -> GhostStatus.Ahead
+    deltaMs >= 500 -> GhostStatus.Behind
+    else -> GhostStatus.Even
+}
+
+/** The push shown and spoken during a rest, depending on where you stand against the record. */
+fun restPush(status: GhostStatus): String = when (status) {
+    GhostStatus.Ahead -> "Ты впереди рекорда, не сбавляй!"
+    GhostStatus.Even -> "Идёшь вровень с рекордом, поднажми!"
+    GhostStatus.Behind -> "Выложись до самого конца!"
+}
+
+/** "5 сек", "1 мин 5 сек"; under a second is "меньше секунды". Truncates like [formatTime]. */
+fun spokenDuration(ms: Long): String {
+    val s = ms.coerceAtLeast(0) / 1000
+    return when {
+        s == 0L -> "меньше секунды"
+        s < 60 -> "$s сек"
+        s % 60 == 0L -> "${s / 60} мин"
+        else -> "${s / 60} мин ${s % 60} сек"
+    }
+}
+
+/** Spoken at the start of a rest: the gap to the record ghost and a push. */
+fun restAnnouncement(deltaMs: Long): String {
+    val status = ghostStatus(deltaMs)
+    val gap = when (status) {
+        GhostStatus.Ahead -> "Впереди рекорда на ${spokenDuration(-deltaMs)}. "
+        GhostStatus.Behind -> "Позади рекорда на ${spokenDuration(deltaMs)}. "
+        GhostStatus.Even -> ""
+    }
+    return gap + restPush(status)
+}
