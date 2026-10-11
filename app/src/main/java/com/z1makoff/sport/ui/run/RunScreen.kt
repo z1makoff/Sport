@@ -55,7 +55,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.z1makoff.sport.core.GhostStatus
 import com.z1makoff.sport.core.Step
+import com.z1makoff.sport.core.ghostStatus
 import com.z1makoff.sport.core.formatDelta
 import com.z1makoff.sport.core.formatTime
 import com.z1makoff.sport.core.formatTimeTenths
@@ -128,6 +130,14 @@ private fun ReadyView(vm: RunViewModel, onStart: () -> Unit, onClose: () -> Unit
                 Text("Побей", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 BigTime(formatTime(goal), color = MaterialTheme.colorScheme.primary)
                 Text("Рекорд ${formatTime(vm.recordTotalMs!!)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (vm.recordWithoutSplits) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "У рекорда нет времени по упражнениям, поэтому по ходу тренировки сравним только с общим временем",
+                        textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             } else {
                 Text("Первая попытка", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text("Её время станет твоим рекордом", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -164,9 +174,11 @@ private fun GhostLine(vm: RunViewModel) {
     val ghost = vm.ghostMs
     val record = vm.recordTotalMs
     val (text, color) = when {
-        ghost != null && ghost < 0 -> "${formatDelta(ghost)} впереди рекорда" to Ahead
-        ghost != null && ghost > 0 -> "${formatDelta(ghost)} позади рекорда" to Behind
-        ghost != null -> "вровень с рекордом" to MaterialTheme.colorScheme.onSurfaceVariant
+        ghost != null -> when (ghostStatus(ghost)) {
+            GhostStatus.Ahead -> "${formatDelta(ghost)} впереди рекорда" to Ahead
+            GhostStatus.Behind -> "${formatDelta(ghost)} позади рекорда" to Behind
+            GhostStatus.Even -> "вровень с рекордом" to MaterialTheme.colorScheme.onSurfaceVariant
+        }
         record != null && vm.elapsedMs <= record -> "до рекорда ${formatTime(record - vm.elapsedMs)}" to MaterialTheme.colorScheme.onSurfaceVariant
         record != null -> "${formatDelta(vm.elapsedMs - record)} после рекорда" to Behind
         else -> "первая попытка" to MaterialTheme.colorScheme.onSurfaceVariant
@@ -213,6 +225,7 @@ private fun ActiveView(vm: RunViewModel, onClose: () -> Unit) {
                     paused -> Text("ПАУЗА", fontSize = 44.sp, fontWeight = FontWeight.Black)
                     rest != null -> {
                         Text("ОТДЫХ ${formatTime((rest - vm.elapsedMs).coerceAtLeast(0) + 999)}", fontSize = 40.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                        vm.restPushText?.let { Text(it, color = Color.Black, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center) }
                         Text("нажми, чтобы пропустить", color = Color.Black)
                     }
                     else -> {

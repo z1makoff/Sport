@@ -18,7 +18,11 @@ import com.z1makoff.sport.core.buildSteps
 import com.z1makoff.sport.core.decodeSplits
 import com.z1makoff.sport.core.encodeSplits
 import com.z1makoff.sport.core.ghostDeltaMs
+import com.z1makoff.sport.core.ghostStatus
 import com.z1makoff.sport.core.goalMs
+import com.z1makoff.sport.core.restAnnouncement
+import com.z1makoff.sport.core.restPush
+import com.z1makoff.sport.core.spokenDuration
 import com.z1makoff.sport.data.AttemptEntity
 import com.z1makoff.sport.data.SportDao
 import com.z1makoff.sport.service.TimerService
@@ -50,6 +54,8 @@ class RunViewModel(app: Application, private val dao: SportDao, private val work
     val splits = mutableStateListOf<Long>()
     /** Elapsed time at which the current rest ends; null when not resting. */
     var restUntilMs by mutableStateOf<Long?>(null); private set
+    /** The push shown during the current rest, fixed at the moment the rest started. */
+    var restPushText by mutableStateOf<String?>(null); private set
     var result by mutableStateOf<RunResult?>(null); private set
 
     private var startedAtWall = 0L
@@ -63,6 +69,8 @@ class RunViewModel(app: Application, private val dao: SportDao, private val work
     val currentStep: Step? get() = steps.getOrNull(splits.size)
     val nextStep: Step? get() = steps.getOrNull(splits.size + 1)
     val ghostMs: Long? get() = ghostDeltaMs(elapsedMs, splits, recordSplitsMs, steps.size)
+    /** A record exists but has no splits for these steps (typed in by hand, or the workout changed). */
+    val recordWithoutSplits: Boolean get() = recordTotalMs != null && recordSplitsMs.size != steps.size
 
     init {
         viewModelScope.launch {
@@ -133,6 +141,7 @@ class RunViewModel(app: Application, private val dao: SportDao, private val work
 
     private fun endRest() {
         restUntilMs = null
+        restPushText = null
         lastRestBeepSec = -1
         cues.beep(long = true)
         currentStep?.let { announce(it) }
@@ -155,7 +164,9 @@ class RunViewModel(app: Application, private val dao: SportDao, private val work
         val next = steps[splits.size]
         if (next.exerciseIndex == 0 && restSec > 0) {
             restUntilMs = t + restSec * 1000L
-            cues.say("Отдых $restSec секунд")
+            val ghost = ghostMs
+            restPushText = ghost?.let { restPush(ghostStatus(it)) }
+            cues.say("Отдых $restSec секунд." + (ghost?.let { " " + restAnnouncement(it) } ?: ""))
         } else {
             announce(next)
         }
@@ -165,6 +176,7 @@ class RunViewModel(app: Application, private val dao: SportDao, private val work
         if (phase != Phase.Running && phase != Phase.Paused) return
         if (splits.isEmpty()) return
         restUntilMs = null
+        restPushText = null
         splits.removeAt(splits.lastIndex)
         cues.vibrate(40)
     }
@@ -201,16 +213,12 @@ class RunViewModel(app: Application, private val dao: SportDao, private val work
             cues.say(
                 when {
                     prev == null -> "Финиш. Первый рекорд"
-                    r.isRecord -> "Новый рекорд! Быстрее на ${spokenSeconds(prev - totalMs)}"
-                    else -> "Финиш. До рекорда не хватило ${spokenSeconds(totalMs - prev)}"
+                    r.isRecord -> "Новый рекорд! Быстрее на ${spokenDuration(prev - totalMs)}"
+                    totalMs == prev -> "Финиш. Ровно как рекорд"
+                    else -> "Финиш. До рекорда не хватило ${spokenDuration(totalMs - prev)}"
                 }
             )
         }
-    }
-
-    private fun spokenSeconds(ms: Long): String {
-        val s = (ms / 1000).coerceAtLeast(0)
-        return if (s < 60) "$s сек" else "${s / 60} мин ${s % 60} сек"
     }
 
     /** Throws away the finished attempt ("Не сохранять"). */
